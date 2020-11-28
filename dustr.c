@@ -9,11 +9,6 @@
 #define HEIGHT 600
 #define FPS 30
 
-typedef struct {
-	int x;
-	int y;
-} Vec2i;
-
 static SDL_Window *gWindow = NULL;
 static SDL_Renderer *gRenderer = NULL;
 static SDL_Texture *gTexture = NULL;
@@ -21,10 +16,10 @@ static uint32_t *pixels = NULL;
 static Vec2i winsize = {WIDTH, HEIGHT};
 static Vec2i winpos = {0, 0};
 static Vec2i mouse = {0, 0};
+static Vec2i requestedcrop = {1, 1};
+static Vec2i originalsize = {0, 0};
 static SDL_Rect croprect = {0, 0, 1, 1};
 static SDL_Rect imgrect = {0, 0, 1, 1};
-static SDL_Rect dispcroprect = {0, 0, 1, 1};
-static SDL_Rect dispimgrect = {0, 0, 1, 1};
 static char *outputfile = NULL;
 
 static int
@@ -48,11 +43,11 @@ init(void)
 	SDL_SetRenderDrawBlendMode(gRenderer, SDL_BLENDMODE_BLEND);
 
 	gTexture = SDL_CreateTexture(gRenderer, SDL_PIXELFORMAT_ABGR8888,
-								 SDL_TEXTUREACCESS_STATIC, imgrect.w, imgrect.h);
+								 SDL_TEXTUREACCESS_STATIC, originalsize.x, originalsize.y);
 	if (!gTexture)
 		sdldie("cannot create SDL texture");
 
-	SDL_UpdateTexture(gTexture, NULL, pixels, imgrect.w * sizeof(uint32_t));
+	SDL_UpdateTexture(gTexture, NULL, pixels, originalsize.x * sizeof(uint32_t));
 
 	return 1;
 }
@@ -70,6 +65,15 @@ quit(void)
 	exit(0);
 }
 
+Vec2i
+getcroppos()
+{
+	Vec2i pos;
+	pos.x = (croprect.x - imgrect.x) * originalsize.x / imgrect.w;
+	pos.y = (croprect.y - imgrect.y) * originalsize.y / imgrect.h;
+	return pos;
+}
+
 void
 mouseevent(SDL_Event *event)
 {
@@ -77,12 +81,13 @@ mouseevent(SDL_Event *event)
 	mouse.y = event->motion.y;
 
 	switch (event->type) {
-	case SDL_MOUSEBUTTONUP:
-		printf("%dx%d@+%d+%d\n", croprect.w, croprect.h, croprect.x - dispimgrect.x, croprect.y - dispimgrect.y);
-		write_png(outputfile, pixels, dispimgrect.w, croprect.w, croprect.h,
-				croprect.x - dispimgrect.x, croprect.y - dispimgrect.y);
+	case SDL_MOUSEBUTTONUP: {
+		Vec2i pos = getcroppos();
+		printf("%dx%d@+%d+%d\n", requestedcrop.x, requestedcrop.y, pos.x, pos.y);
+		write_png(outputfile, pixels, originalsize.x, requestedcrop, pos);
 		quit();
 		break;
+	}
 	}
 }
 
@@ -106,22 +111,35 @@ draw()
 	SDL_RenderClear(gRenderer);
 
 	// Draw image background
-	dispimgrect = imgrect;
-	dispimgrect.x = (winsize.x - (int)dispimgrect.w) * 0.5;
-	dispimgrect.y = (winsize.y - (int)dispimgrect.h) * 0.5;
-	SDL_RenderCopy(gRenderer, gTexture, NULL, &dispimgrect);
+	if (originalsize.x > winsize.x || originalsize.y > winsize.y) {
+		if (winsize.x / (float)originalsize.x > winsize.y / (float)originalsize.y) {
+			imgrect.w = winsize.y * originalsize.x / originalsize.y;
+			imgrect.h = winsize.y;
+		} else {
+			imgrect.w = winsize.x;
+			imgrect.h = winsize.x * originalsize.y / originalsize.x;
+		}
+	} else {
+		imgrect.w = originalsize.x;
+		imgrect.h = originalsize.y;
+	}
+	imgrect.x = (winsize.x - (int)imgrect.w) * 0.5;
+	imgrect.y = (winsize.y - (int)imgrect.h) * 0.5;
+	SDL_RenderCopy(gRenderer, gTexture, NULL, &imgrect);
 
 	// Draw crop rectangle
+	croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
+	croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
 	croprect.x = mouse.x - croprect.w * 0.5;
 	croprect.y = mouse.y - croprect.h * 0.5;
-	if (croprect.x < dispimgrect.x)
-		croprect.x = dispimgrect.x;
-	else if (croprect.x + croprect.w > dispimgrect.x + dispimgrect.w)
-		croprect.x = dispimgrect.x + dispimgrect.w - croprect.w;
-	if (croprect.y < dispimgrect.y)
-		croprect.y = dispimgrect.y;
-	else if (croprect.y + croprect.h > dispimgrect.y + dispimgrect.h)
-		croprect.y = dispimgrect.y + dispimgrect.h - croprect.h;
+	if (croprect.x < imgrect.x)
+		croprect.x = imgrect.x;
+	else if (croprect.x + croprect.w > imgrect.x + imgrect.w)
+		croprect.x = imgrect.x + imgrect.w - croprect.w;
+	if (croprect.y < imgrect.y)
+		croprect.y = imgrect.y;
+	else if (croprect.y + croprect.h > imgrect.y + imgrect.h)
+		croprect.y = imgrect.y + imgrect.h - croprect.h;
 
 	SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
 	SDL_Rect rect1 = croprect;
@@ -156,7 +174,7 @@ main(int argc, char *argv[])
 
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-g")) {
-			if (argc < i + 4 || sscanf(argv[++i], "%ux%u", (uint32_t*)&croprect.w, (uint32_t*)&croprect.h) < 2)
+			if (argc < i + 4 || sscanf(argv[++i], "%ux%u", (uint32_t*)&requestedcrop.x, (uint32_t*)&requestedcrop.y) < 2)
 				usage(argv[0]);
 		// TODO add option to choose an aspect ratio rather than geometry
 		} else if (!inputfile) {
@@ -169,7 +187,7 @@ main(int argc, char *argv[])
 	if (!inputfile || !outputfile)
 		usage(argv[0]);
 
-	read_png(inputfile, &pixels, (uint32_t*)&imgrect.w, (uint32_t*)&imgrect.h);
+	read_png(inputfile, &pixels, (uint32_t*)&originalsize.x, (uint32_t*)&originalsize.y);
 
 	/* Initialize GUI */
 	init();
@@ -181,7 +199,7 @@ main(int argc, char *argv[])
 			SDL_Delay(ticknext - tick);
 		ticknext = tick + (1000 / FPS);
 
-		draw(pixels);
+		draw();
 
 		while (SDL_PollEvent(&event) != 0) {
 			if (event.type == SDL_QUIT)
@@ -197,7 +215,7 @@ main(int argc, char *argv[])
 						event.window.event == SDL_WINDOWEVENT_RESIZED) {
 					SDL_GetWindowSize(gWindow, &winsize.x, &winsize.y);
 					SDL_GetWindowPosition(gWindow, &winpos.x, &winpos.y);
-					draw(pixels);
+					draw();
 				}
 			}
 		}

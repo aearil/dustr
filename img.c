@@ -77,21 +77,21 @@ png_setup_writer(FILE *fd, png_struct **s, png_info **i, uint32_t w, uint32_t h)
 }
 
 void
-write_png(const char *file, uint32_t *pixels, uint32_t stride, uint32_t width, uint32_t height, uint32_t offx, uint32_t offy)
+write_png(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 {
 	png_struct *pngs;
 	png_info *pngi;
-	uint32_t i;
+	int i;
 	FILE *f;
 
 	if (!(f = fopen(file, "wb")))
 		die("%s could not be created", file);
 
-	png_setup_writer(f, &pngs, &pngi, width, height);
+	png_setup_writer(f, &pngs, &pngi, size.x, size.y);
 
 	/* write data */
-	for (i = offy; i < height + offy; ++i)
-		png_write_row(pngs, (uint8_t *)(pixels + i * stride + offx));
+	for (i = off.y; i < size.y + off.y; ++i)
+		png_write_row(pngs, (uint8_t *)(pixels + i * stride + off.x));
 
 	/* clean up */
 	png_write_end(pngs, NULL);

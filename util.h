@@ -1,4 +1,4 @@
-/* See LICENSE file for copyright and license details. */
+#pragma once
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
@@ -10,6 +10,11 @@
 #define SETFLAG(X, F, B) ((X) ^= ((~(B) + 1) ^ (X)) & (F))
 
 #define NO_VALUE -1
+
+typedef struct {
+	int x;
+	int y;
+} Vec2i;
 
 void die(const char *fmt, ...);
 void *ecalloc(size_t nmemb, size_t size);

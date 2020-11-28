@@ -13,3 +13,11 @@ dustr -g 200x300 in.png out.jpg
 ```
 
 Click to crop
+
+## TODO ##
+
+* Add jpeg support
+* Add magnifying glass feature
+* Add keyboard movement
+* Add drag to crop
+* Batch processing
