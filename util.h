@@ -1,5 +1,8 @@
 #pragma once
 
+#include <sys/types.h>
+#include <stdio.h>
+
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define BETWEEN(X, A, B) ((A) <= (X) && (X) <= (B))
@@ -21,3 +24,5 @@ void *ecalloc(size_t nmemb, size_t size);
 void sdldie(const char *msg);
 void sdlerrcheck(int line);
 char *readfile(const char *file);
+void efread(void *p, size_t s, size_t n, FILE *f);
+void efwrite(const void *p, size_t s, size_t n, FILE *f);

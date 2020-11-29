@@ -1,5 +1,5 @@
 dustr: dustr.o util.o img.o
-	cc -std=c99 -g -Wall -Wpedantic -Wextra -lSDL2 -lpng $^ -o $@
+	cc -std=c99 -g -Wall -Wpedantic -Wextra -lSDL2 -lpng -ljpeg $^ -o $@
 
 #%.o: %.h
 util.o: util.h

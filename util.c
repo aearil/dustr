@@ -67,3 +67,21 @@ char *readfile(const char *file) {
   str[flen + 1] = '\0';
   return str;
 }
+
+void
+efread(void *p, size_t s, size_t n, FILE *f)
+{
+	if (fread(p, s, n, f) != n) {
+		if (ferror(f))
+			die("fread:");
+		else
+			die("fread: Unexpected end of file");
+	}
+}
+
+void
+efwrite(const void *p, size_t s, size_t n, FILE *f)
+{
+	if (fwrite(p, s, n, f) != n)
+		die("fwrite:");
+}

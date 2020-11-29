@@ -1,6 +1,10 @@
-#include <png.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+
+#include <jpeglib.h>
+#include <png.h>
 
 #include "util.h"
 
@@ -9,6 +13,14 @@ png_err(png_struct *pngs, const char *msg)
 {
 	(void)pngs;
 	die("libpng: %s", msg);
+}
+
+static void
+jpeg_err(j_common_ptr js)
+{
+	fprintf(stderr, "libjpeg: ");
+	(*js->err->output_message)(js);
+	exit(1);
 }
 
 static void
@@ -35,29 +47,24 @@ png_setup_reader(FILE *fd, png_struct **s, png_info **i, uint32_t *w, uint32_t *
 }
 
 void
-read_png(const char *file, uint32_t **pixels, uint32_t *width, uint32_t *height)
+read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 {
 	png_struct *pngs;
 	png_info *pngi;
 	uint32_t rowlen, r;
 	uint8_t **pngrows;
-	FILE *f;
-
-	if (!(f = fopen(file, "rb")))
-		die("%s could not be read", file);
 
 	/* prepare */
-	png_setup_reader(f, &pngs, &pngi, width, height);
-	rowlen = *width * (sizeof("RGBA") - 1);
+	png_setup_reader(fd, &pngs, &pngi, (uint32_t*)&size->x, (uint32_t*)&size->y);
+	rowlen = size->x * (sizeof("RGBA") - 1);
 	pngrows = png_get_rows(pngs, pngi);
 
-	*pixels = ecalloc(*width * *height, sizeof(uint32_t));
-	for (r = 0; r < *height; ++r)
-		memcpy(*pixels + r * *width, pngrows[r], rowlen);
+	*pixels = ecalloc(size->x * size->y, sizeof(uint32_t));
+	for (r = 0; r < size->y; ++r)
+		memcpy(*pixels + r * size->x, pngrows[r], rowlen);
 
 	/* clean up */
 	png_destroy_read_struct(&pngs, &pngi, NULL);
-	fclose(f);
 }
 
 static void
@@ -96,6 +103,126 @@ write_png(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i
 	/* clean up */
 	png_write_end(pngs, NULL);
 	png_destroy_write_struct(&pngs, NULL);
+	fclose(f);
+}
+
+void
+read_jpg(FILE *fd, uint32_t **pixels, Vec2i *size)
+{
+	struct jpeg_decompress_struct js;
+	struct jpeg_error_mgr jerr;
+	uint8_t *row;
+	size_t i;
+
+	/* prepare */
+	jpeg_create_decompress(&js);
+	jerr.error_exit = jpeg_err;
+	js.err = jpeg_std_error(&jerr);
+
+	jpeg_stdio_src(&js, fd);
+	jpeg_read_header(&js, 1);
+	size->x = js.image_width;
+	size->y = js.image_height;
+	js.output_components = 3;     /* color components per pixel */
+	js.out_color_space = JCS_RGB; /* libjpeg output color space */
+
+	jpeg_start_decompress(&js);
+	row = ecalloc(size->x, (sizeof("RGB") - 1) * sizeof(uint8_t));
+	*pixels = ecalloc(size->x * size->y, sizeof(uint32_t));
+
+	/* write data */
+	while (js.output_scanline < js.output_height) {
+		jpeg_read_scanlines(&js, &row, 1);
+
+		for (i = 0; i < size->x; ++i) {
+			/* Don't forget about that little endianness */
+			uint32_t px = row[3*i] | row[3*i+1] << 8 | row[3*i+2] << 16 | 0xff000000;
+			(*pixels)[(js.output_scanline - 1) * size->x + i] = px;
+		}
+	}
+
+	/* clean up */
+	jpeg_finish_decompress(&js);
+	jpeg_destroy_decompress(&js);
+}
+
+void
+write_jpg(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
+{
+	struct jpeg_compress_struct jcomp;
+	struct jpeg_error_mgr jerr;
+	uint64_t a;
+	uint32_t i, j, k, l;
+	uint8_t *row;
+	// TODO provide interface for those settings
+	uint8_t mask[3] = { 0xff, 0xff, 0xff };
+	int quality = 85;
+	FILE *f;
+
+	if (!(f = fopen(file, "wb")))
+		die("%s could not be created", file);
+
+	/* prepare */
+	jpeg_create_compress(&jcomp);
+	jerr.error_exit = jpeg_err;
+	jcomp.err = jpeg_std_error(&jerr);
+
+	jpeg_stdio_dest(&jcomp, f);
+	jcomp.image_width = size.x;
+	jcomp.image_height = size.y;
+	jcomp.input_components = 3;     /* color components per pixel */
+	jcomp.in_color_space = JCS_RGB; /* output color space */
+	jcomp.optimize_coding = 1;      /* Optimize the Huffman table: smaller but slower */
+	jpeg_set_defaults(&jcomp);
+
+	jpeg_set_quality(&jcomp, quality, 1);
+	jpeg_start_compress(&jcomp, 1);
+
+	row = ecalloc(size.x, (sizeof("RGB") - 1) * sizeof(uint8_t));
+
+	/* write data */
+	for (i = 0; i < size.y; ++i) {
+		for (j = 0, k = 0; j < size.x; j++, k += 3) {
+			uint8_t *px = (uint8_t*)(pixels + i * stride + off.x + j);
+			a = px[3];
+			for (l = 0; l < 3; l++)  /* alpha blending */
+				row[k + l] = (a * px[l] + (0xff - a) * mask[l]) / 0xff;
+		}
+		jpeg_write_scanlines(&jcomp, &row, 1);
+	}
+
+	/* clean up */
+	jpeg_finish_compress(&jcomp);
+	jpeg_destroy_compress(&jcomp);
+
+	fclose(f);
+}
+
+void
+read_img(const char *file, uint32_t **pixels, Vec2i *size)
+{
+	uint8_t header[8];
+	uint8_t jpgsig[] = {0xFF, 0xD8};
+	uint8_t pngsig[] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+	FILE *f;
+
+	if (!(f = fopen(file, "rb")))
+		die("%s could not be read", file);
+
+	efread(header, sizeof(header[0]), LENGTH(header), f);
+	if (fseek(f, 0, SEEK_SET))
+		die("%s: seek error", file);
+
+	if (!memcmp(jpgsig, header, sizeof(jpgsig))) {
+		read_jpg(f, pixels, size);
+		fprintf(stderr, "%s: file type: jpg\n", file);
+	} else if (!memcmp(pngsig, header, sizeof(pngsig))) {
+		read_png(f, pixels, size);
+		fprintf(stderr, "%s: file type: png\n", file);
+	} else {
+		die("%s: unsupported file type", file);
+	}
+
 	fclose(f);
 }
 
