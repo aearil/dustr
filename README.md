@@ -16,7 +16,6 @@ Click to crop
 
 ## TODO ##
 
-* Add jpeg support
 * Add magnifying glass feature
 * Add keyboard movement
 * Add drag to crop

@@ -6,7 +6,7 @@
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define BETWEEN(X, A, B) ((A) <= (X) && (X) <= (B))
-#define LENGTH(X) (sizeof X / sizeof X[0])
+#define LENGTH(X) (sizeof(X) / sizeof(X[0]))
 /* Sets F flag in X depending on bool B state */
 /* https://graphics.stanford.edu/~seander/bithacks.html#ConditionalSetOrClearBitsWithoutBranching
  */

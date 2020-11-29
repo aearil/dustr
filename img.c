@@ -84,17 +84,13 @@ png_setup_writer(FILE *fd, png_struct **s, png_info **i, uint32_t w, uint32_t h)
 }
 
 void
-write_png(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
+write_png(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 {
 	png_struct *pngs;
 	png_info *pngi;
 	int i;
-	FILE *f;
 
-	if (!(f = fopen(file, "wb")))
-		die("%s could not be created", file);
-
-	png_setup_writer(f, &pngs, &pngi, size.x, size.y);
+	png_setup_writer(fd, &pngs, &pngi, size.x, size.y);
 
 	/* write data */
 	for (i = off.y; i < size.y + off.y; ++i)
@@ -103,7 +99,6 @@ write_png(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i
 	/* clean up */
 	png_write_end(pngs, NULL);
 	png_destroy_write_struct(&pngs, NULL);
-	fclose(f);
 }
 
 void
@@ -147,7 +142,7 @@ read_jpg(FILE *fd, uint32_t **pixels, Vec2i *size)
 }
 
 void
-write_jpg(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
+write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 {
 	struct jpeg_compress_struct jcomp;
 	struct jpeg_error_mgr jerr;
@@ -157,17 +152,13 @@ write_jpg(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i
 	// TODO provide interface for those settings
 	uint8_t mask[3] = { 0xff, 0xff, 0xff };
 	int quality = 85;
-	FILE *f;
-
-	if (!(f = fopen(file, "wb")))
-		die("%s could not be created", file);
 
 	/* prepare */
 	jpeg_create_compress(&jcomp);
 	jerr.error_exit = jpeg_err;
 	jcomp.err = jpeg_std_error(&jerr);
 
-	jpeg_stdio_dest(&jcomp, f);
+	jpeg_stdio_dest(&jcomp, fd);
 	jcomp.image_width = size.x;
 	jcomp.image_height = size.y;
 	jcomp.input_components = 3;     /* color components per pixel */
@@ -194,8 +185,6 @@ write_jpg(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i
 	/* clean up */
 	jpeg_finish_compress(&jcomp);
 	jpeg_destroy_compress(&jcomp);
-
-	fclose(f);
 }
 
 void
@@ -221,6 +210,37 @@ read_img(const char *file, uint32_t **pixels, Vec2i *size)
 		fprintf(stderr, "%s: file type: png\n", file);
 	} else {
 		die("%s: unsupported file type", file);
+	}
+
+	fclose(f);
+}
+
+void
+write_img(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
+{
+	enum {PNG, JPG};
+	int type = PNG;
+	size_t l = strlen(file) + 1;
+	FILE *f;
+
+	if (!strcmp(".png", file + l - sizeof(".png")))
+		type = PNG;
+	else if(!strcmp(".jpeg", file + l - sizeof(".jpeg")) ||
+			!strcmp(".jpg", file + l - sizeof(".jpg")))
+		type = JPG;
+	else
+		fprintf(stderr, "Couldn't infer file type of %s: defaulting to png\n", file);
+
+	if (!(f = fopen(file, "wb")))
+		die("%s could not be created", file);
+
+	switch (type) {
+	case PNG:
+		write_png(f, pixels, stride, size, off);
+		break;
+	case JPG:
+		write_jpg(f, pixels, stride, size, off);
+		break;
 	}
 
 	fclose(f);

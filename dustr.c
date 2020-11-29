@@ -84,8 +84,7 @@ mouseevent(SDL_Event *event)
 	case SDL_MOUSEBUTTONUP: {
 		Vec2i pos = getcroppos();
 		printf("%dx%d@+%d+%d\n", requestedcrop.x, requestedcrop.y, pos.x, pos.y);
-		// write_png(outputfile, pixels, originalsize.x, requestedcrop, pos);
-		write_jpg(outputfile, pixels, originalsize.x, requestedcrop, pos);
+		write_img(outputfile, pixels, originalsize.x, requestedcrop, pos);
 		quit();
 		break;
 	}
@@ -188,7 +187,6 @@ main(int argc, char *argv[])
 	if (!inputfile || !outputfile)
 		usage(argv[0]);
 
-	//read_png(inputfile, &pixels, (uint32_t*)&originalsize.x, (uint32_t*)&originalsize.y);
 	read_img(inputfile, &pixels, &originalsize);
 
 	/* Initialize GUI */
