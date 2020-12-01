@@ -172,7 +172,7 @@ write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 	row = ecalloc(size.x, (sizeof("RGB") - 1) * sizeof(uint8_t));
 
 	/* write data */
-	for (i = 0; i < size.y; ++i) {
+	for (i = off.y; i < size.y + off.y; ++i) {
 		for (j = 0, k = 0; j < size.x; j++, k += 3) {
 			uint8_t *px = (uint8_t*)(pixels + i * stride + off.x + j);
 			a = px[3];
