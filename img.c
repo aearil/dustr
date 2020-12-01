@@ -202,15 +202,12 @@ read_img(const char *file, uint32_t **pixels, Vec2i *size)
 	if (fseek(f, 0, SEEK_SET))
 		die("%s: seek error", file);
 
-	if (!memcmp(jpgsig, header, sizeof(jpgsig))) {
+	if (!memcmp(jpgsig, header, sizeof(jpgsig)))
 		read_jpg(f, pixels, size);
-		fprintf(stderr, "%s: file type: jpg\n", file);
-	} else if (!memcmp(pngsig, header, sizeof(pngsig))) {
+	else if (!memcmp(pngsig, header, sizeof(pngsig)))
 		read_png(f, pixels, size);
-		fprintf(stderr, "%s: file type: png\n", file);
-	} else {
+	else
 		die("%s: unsupported file type", file);
-	}
 
 	fclose(f);
 }

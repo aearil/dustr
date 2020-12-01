@@ -14,9 +14,18 @@ dustr -g 200x300 in.png out.jpg
 
 Click to crop
 
+## Tips ##
+
+Fit an image to a specific format while keeping the aspect ratio. Useful for preprocessing huge wallpapers.
+
+```
+convert huge.jpg -resize "1920x1080^" resized.jpg
+```
+
 ## TODO ##
 
 * Add magnifying glass feature
 * Add keyboard movement
 * Add drag to crop
 * Batch processing
+* stdin/stdout IO
