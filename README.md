@@ -26,6 +26,18 @@ Fit an image to a specific format while keeping the aspect ratio. Useful for pre
 convert huge.jpg -resize "1920x1080^" resized.jpg
 ```
 
+## Installation ##
+
+Simple build to try it out:
+```
+make
+```
+
+System wide install:
+```
+sudo make install
+```
+
 ## TODO ##
 
 * Add magnifying glass feature
