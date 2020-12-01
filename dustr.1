@@ -1,0 +1,51 @@
+.Dd 2020-12-01
+.Dt DUSTR 1
+.Os Linux
+.Sh NAME
+.Nm dustr
+.Nd Light interactive cropping tool
+.Sh SYNOPSIS
+.Nm
+.\" .Op Fl g Ar geometry
+.Brq Fl g Ar geometry | Fl s
+.Ar infile
+.Ar outfile
+.Sh DESCRIPTION
+.Nm
+reads
+.Ar infile
+and tries to load it as either a PNG or JPG encoded file. It then shows a window allowing to select an area to crop using the mouse.
+.Pp
+Once the selection is made by click the left mouse button, the resulting cropped image is written to
+.Ar outfile
+(the format is guessed based on the file extension, and defaults to PNG)
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl g Ar geometry
+Set a predetermined cropping
+.Ar geometry
+in the <width>x<height> format. Incompatible with
+.Op Fl s
+.It Fl s
+Click and drag to select an area to crop. Incompatible with
+.Op Fl g
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It 0
+Image processed successfully.
+.It 1
+An error occurred.
+.El
+.Sh EXAMPLES
+$
+.Nm
+-g 200x300 in.png out.jpg
+.Pp
+$
+.Nm
+-s in.jpg selection.png
+.Sh SEE ALSO
+.Xr ImageMagick 1
+.Sh AUTHORS
+.An Aearil Aq Mt aearil@paranoici.org
