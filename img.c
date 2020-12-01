@@ -51,7 +51,7 @@ read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 {
 	png_struct *pngs;
 	png_info *pngi;
-	uint32_t rowlen, r;
+	size_t rowlen, r;
 	uint8_t **pngrows;
 
 	/* prepare */
@@ -60,7 +60,7 @@ read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 	pngrows = png_get_rows(pngs, pngi);
 
 	*pixels = ecalloc(size->x * size->y, sizeof(uint32_t));
-	for (r = 0; r < size->y; ++r)
+	for (r = 0; r < (size_t)size->y; ++r)
 		memcpy(*pixels + r * size->x, pngrows[r], rowlen);
 
 	/* clean up */
@@ -129,7 +129,7 @@ read_jpg(FILE *fd, uint32_t **pixels, Vec2i *size)
 	while (js.output_scanline < js.output_height) {
 		jpeg_read_scanlines(&js, &row, 1);
 
-		for (i = 0; i < size->x; ++i) {
+		for (i = 0; i < (size_t)size->x; ++i) {
 			/* Don't forget about that little endianness */
 			uint32_t px = row[3*i] | row[3*i+1] << 8 | row[3*i+2] << 16 | 0xff000000;
 			(*pixels)[(js.output_scanline - 1) * size->x + i] = px;
@@ -147,7 +147,7 @@ write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 	struct jpeg_compress_struct jcomp;
 	struct jpeg_error_mgr jerr;
 	uint64_t a;
-	uint32_t i, j, k, l;
+	size_t i, j, k, l;
 	uint8_t *row;
 	// TODO provide interface for those settings
 	uint8_t mask[3] = { 0xff, 0xff, 0xff };
@@ -172,8 +172,8 @@ write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 	row = ecalloc(size.x, (sizeof("RGB") - 1) * sizeof(uint8_t));
 
 	/* write data */
-	for (i = off.y; i < size.y + off.y; ++i) {
-		for (j = 0, k = 0; j < size.x; j++, k += 3) {
+	for (i = off.y; i < (size_t)(size.y + off.y); ++i) {
+		for (j = 0, k = 0; j < (size_t)size.x; j++, k += 3) {
 			uint8_t *px = (uint8_t*)(pixels + i * stride + off.x + j);
 			a = px[3];
 			for (l = 0; l < 3; l++)  /* alpha blending */
