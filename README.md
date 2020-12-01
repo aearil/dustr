@@ -8,11 +8,15 @@ This tool is especially useful when you know the output size, but you need to pi
 
 ## Usage ##
 
+Click to crop at a given geometry:
 ```
 dustr -g 200x300 in.png out.jpg
 ```
 
-Click to crop
+Click and drag to crop:
+```
+dustr -s in.jpg selection.png
+```
 
 ## Tips ##
 
@@ -26,6 +30,6 @@ convert huge.jpg -resize "1920x1080^" resized.jpg
 
 * Add magnifying glass feature
 * Add keyboard movement
-* Add drag to crop
 * Batch processing
 * stdin/stdout IO
+* Implicit output filename

@@ -9,6 +9,8 @@
 #define HEIGHT 600
 #define FPS 30
 
+enum Mode {ModeGeom, ModeSelect, ModeInit};
+
 static SDL_Window *gWindow = NULL;
 static SDL_Renderer *gRenderer = NULL;
 static SDL_Texture *gTexture = NULL;
@@ -17,10 +19,13 @@ static Vec2i winsize = {WIDTH, HEIGHT};
 static Vec2i winpos = {0, 0};
 static Vec2i mouse = {0, 0};
 static Vec2i requestedcrop = {1, 1};
+static Vec2i croporigin = {0, 0};
 static Vec2i originalsize = {0, 0};
-static SDL_Rect croprect = {0, 0, 1, 1};
+static SDL_Rect croprect = {-999, -999, 1, 1};
 static SDL_Rect imgrect = {0, 0, 1, 1};
 static char *outputfile = NULL;
+static enum Mode mode = ModeInit;
+static int drawcrop = 1;
 
 static int
 init(void)
@@ -65,13 +70,23 @@ quit(void)
 	exit(0);
 }
 
-Vec2i
-getcroppos()
+void
+getfinalcrop(Vec2i *pos, Vec2i *size)
 {
-	Vec2i pos;
-	pos.x = (croprect.x - imgrect.x) * originalsize.x / imgrect.w;
-	pos.y = (croprect.y - imgrect.y) * originalsize.y / imgrect.h;
-	return pos;
+	*size = requestedcrop;
+
+	pos->x = (croprect.x - imgrect.x) * originalsize.x / imgrect.w;
+	pos->y = (croprect.y - imgrect.y) * originalsize.y / imgrect.h;
+
+	if (size->x < 0) {
+		size->x = -size->x;
+		pos->x -= size->x;
+	}
+
+	if (size->y < 0) {
+		size->y = -size->y;
+		pos->y -= size->y;
+	}
 }
 
 void
@@ -81,10 +96,18 @@ mouseevent(SDL_Event *event)
 	mouse.y = event->motion.y;
 
 	switch (event->type) {
+	case SDL_MOUSEBUTTONDOWN:
+		if (mode == ModeSelect) {
+			drawcrop = 1;
+			croporigin.x = mouse.x;
+			croporigin.y = mouse.y;
+		}
+		break;
 	case SDL_MOUSEBUTTONUP: {
-		Vec2i pos = getcroppos();
-		printf("%dx%d@+%d+%d\n", requestedcrop.x, requestedcrop.y, pos.x, pos.y);
-		write_img(outputfile, pixels, originalsize.x, requestedcrop, pos);
+		Vec2i pos, size;
+		getfinalcrop(&pos, &size);
+		printf("%dx%d@+%d+%d\n", size.x, size.y, pos.x, pos.y);
+		write_img(outputfile, pixels, originalsize.x, size, pos);
 		quit();
 		break;
 	}
@@ -105,12 +128,9 @@ keyevent(SDL_Event *event)
 }
 
 void
-draw()
+update()
 {
-	SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0xff);
-	SDL_RenderClear(gRenderer);
-
-	// Draw image background
+	/* Compute image display geometry */
 	if (originalsize.x > winsize.x || originalsize.y > winsize.y) {
 		if (winsize.x / (float)originalsize.x > winsize.y / (float)originalsize.y) {
 			imgrect.w = winsize.y * originalsize.x / originalsize.y;
@@ -125,13 +145,24 @@ draw()
 	}
 	imgrect.x = (winsize.x - (int)imgrect.w) * 0.5;
 	imgrect.y = (winsize.y - (int)imgrect.h) * 0.5;
-	SDL_RenderCopy(gRenderer, gTexture, NULL, &imgrect);
 
-	// Draw crop rectangle
+	/* Compute displayed crop rectangle */
+	switch (mode) {
+	case ModeGeom:
+		croporigin.x = mouse.x - croprect.w * 0.5;
+		croporigin.y = mouse.y - croprect.h * 0.5;
+		break;
+	case ModeSelect:
+		requestedcrop.x = mouse.x - croporigin.x;
+		requestedcrop.y = mouse.y - croporigin.y;
+		break;
+	default:
+		break;
+	}
 	croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
 	croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
-	croprect.x = mouse.x - croprect.w * 0.5;
-	croprect.y = mouse.y - croprect.h * 0.5;
+	croprect.x = croporigin.x;
+	croprect.y = croporigin.y;
 	if (croprect.x < imgrect.x)
 		croprect.x = imgrect.x;
 	else if (croprect.x + croprect.w > imgrect.x + imgrect.w)
@@ -140,21 +171,26 @@ draw()
 		croprect.y = imgrect.y;
 	else if (croprect.y + croprect.h > imgrect.y + imgrect.h)
 		croprect.y = imgrect.y + imgrect.h - croprect.h;
+}
 
-	SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
-	SDL_Rect rect1 = croprect;
-	rect1.x -= 1;
-	rect1.y -= 1;
-	rect1.w += 2;
-	rect1.h += 2;
-	SDL_Rect rect2 = rect1;
-	rect2.x -= 1;
-	rect2.y -= 1;
-	rect2.w += 2;
-	rect2.h += 2;
-	SDL_RenderDrawRect(gRenderer, &rect1);
+void
+draw()
+{
 	SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0xff);
-	SDL_RenderDrawRect(gRenderer, &rect2);
+	SDL_RenderClear(gRenderer);
+
+	/* Draw image background */
+	SDL_RenderCopy(gRenderer, gTexture, NULL, &imgrect);
+
+	/* Draw crop rectangle */
+	if (drawcrop) {
+		SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
+		SDL_Rect rect1 = {croprect.x - 1, croprect.y - 1, croprect.w + 2, croprect.h + 2};
+		SDL_Rect rect2 = {croprect.x - 2, croprect.y - 2, croprect.w + 4, croprect.h + 4};
+		SDL_RenderDrawRect(gRenderer, &rect1);
+		SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 0xff);
+		SDL_RenderDrawRect(gRenderer, &rect2);
+	}
 
 	SDL_RenderPresent(gRenderer);
 }
@@ -172,10 +208,20 @@ main(int argc, char *argv[])
 
 	char *inputfile = NULL;
 
+	/* Parse arguments */
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-g")) {
 			if (argc < i + 4 || sscanf(argv[++i], "%ux%u", (uint32_t*)&requestedcrop.x, (uint32_t*)&requestedcrop.y) < 2)
 				usage(argv[0]);
+			else if (mode != ModeInit)
+				die("Options -g and -s are incompatible");
+			mode = ModeGeom;
+			drawcrop = 1;
+		} else if (!strcmp(argv[i], "-s")) {
+			if (mode != ModeInit)
+				die("Options -g and -s are incompatible");
+			mode = ModeSelect;
+			drawcrop = 0;
 		// TODO add option to choose an aspect ratio rather than geometry
 		} else if (!inputfile) {
 			inputfile = argv[i];
@@ -187,6 +233,7 @@ main(int argc, char *argv[])
 	if (!inputfile || !outputfile)
 		usage(argv[0]);
 
+	/* Load image file */
 	read_img(inputfile, &pixels, &originalsize);
 
 	/* Initialize GUI */
@@ -198,8 +245,6 @@ main(int argc, char *argv[])
 		if (tick < ticknext)
 			SDL_Delay(ticknext - tick);
 		ticknext = tick + (1000 / FPS);
-
-		draw();
 
 		while (SDL_PollEvent(&event) != 0) {
 			if (event.type == SDL_QUIT)
@@ -215,11 +260,14 @@ main(int argc, char *argv[])
 						event.window.event == SDL_WINDOWEVENT_RESIZED) {
 					SDL_GetWindowSize(gWindow, &winsize.x, &winsize.y);
 					SDL_GetWindowPosition(gWindow, &winpos.x, &winpos.y);
-					draw();
 				}
 			}
 		}
+
+		update();
+		draw();
 	}
+
 	quit();
 	return 0;
 }
