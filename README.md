@@ -26,6 +26,11 @@ Fit an image to a specific format while keeping the aspect ratio. Useful for pre
 convert huge.jpg -resize "1920x1080^" resized.jpg
 ```
 
+You can use this command to directly set a background from an ill-sized wallpaper
+```
+convert wallpaper.jpg -resize "1920x1080^" - | dustr -g 1920x1080 - - | feh --bg-fill -
+```
+
 ## Installation ##
 
 Simple build to try it out:
@@ -43,5 +48,4 @@ sudo make install
 * Add magnifying glass feature
 * Add keyboard movement
 * Batch processing
-* stdin/stdout IO
 * Implicit output filename

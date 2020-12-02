@@ -19,6 +19,16 @@ and tries to load it as either a PNG or JPG encoded file. It then shows a window
 Once the selection is made by click the left mouse button, the resulting cropped image is written to
 .Ar outfile
 (the format is guessed based on the file extension, and defaults to PNG)
+.Pp
+Both
+.Ar infile
+and
+.Ar outfile
+can be '-', in which case the imagees will be respectively read from stdin and written to stdout. In the case of
+.Ar outfile
+,
+.Nm
+will preserve the input image format.
 .Sh OPTIONS
 .Bl -tag -width Ds
 .It Fl g Ar geometry

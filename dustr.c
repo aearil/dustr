@@ -26,6 +26,7 @@ static SDL_Rect imgrect = {0, 0, 1, 1};
 static char *outputfile = NULL;
 static enum Mode mode = ModeInit;
 static int drawcrop = 1;
+static enum ImgFmt infmt;
 
 static int
 init(void)
@@ -106,8 +107,8 @@ mouseevent(SDL_Event *event)
 	case SDL_MOUSEBUTTONUP: {
 		Vec2i pos, size;
 		getfinalcrop(&pos, &size);
-		printf("%dx%d@+%d+%d\n", size.x, size.y, pos.x, pos.y);
-		write_img(outputfile, pixels, originalsize.x, size, pos);
+		fprintf(stderr, "%dx%d@+%d+%d\n", size.x, size.y, pos.x, pos.y);
+		write_img(outputfile, pixels, originalsize.x, size, pos, infmt);
 		quit();
 		break;
 	}
@@ -234,7 +235,7 @@ main(int argc, char *argv[])
 		usage(argv[0]);
 
 	/* Load image file */
-	read_img(inputfile, &pixels, &originalsize);
+	infmt = read_img(inputfile, &pixels, &originalsize);
 
 	/* Initialize GUI */
 	init();

@@ -5,12 +5,9 @@
 
 #include "util.h"
 
-void read_png(FILE *fd, uint32_t **pixels, Vec2i *size);
-void read_jpg(FILE *fd, uint32_t **pixels, Vec2i *size);
-void read_img(const char *file, uint32_t **pixels, Vec2i *size);
+enum ImgFmt {IMG_PNG, IMG_JPG};
 
-void write_png(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off);
-void write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off);
-void write_img(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off);
+enum ImgFmt read_img(const char *file, uint32_t **pixels, Vec2i *size);
+void write_img(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off, enum ImgFmt infmt);
 
 void print_img(uint32_t *pixels, uint32_t w, uint32_t h, uint32_t maxw);

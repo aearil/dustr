@@ -6,7 +6,7 @@
 #include <jpeglib.h>
 #include <png.h>
 
-#include "util.h"
+#include "img.h"
 
 static void
 png_err(png_struct *pngs, const char *msg)
@@ -23,29 +23,6 @@ jpeg_err(j_common_ptr js)
 	exit(1);
 }
 
-static void
-png_setup_reader(FILE *fd, png_struct **s, png_info **i, uint32_t *w, uint32_t *h)
-{
-	*s = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, png_err, NULL);
-	*i = png_create_info_struct(*s);
-
-	if (!*s || !*i)
-		die("Failed to initialize libpng");
-
-	png_init_io(*s, fd);
-	if (png_get_valid(*s, *i, PNG_INFO_tRNS)) {
-		png_set_tRNS_to_alpha(*s);
-	}
-	png_set_add_alpha(*s, 0xffff, PNG_FILLER_AFTER);
-	png_set_expand_gray_1_2_4_to_8(*s);
-	png_set_gray_to_rgb(*s);
-	png_set_packing(*s);
-	// TODO Support 16 bit color depth
-	png_read_png(*s, *i, PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_STRIP_16, NULL);
-	*w = png_get_image_width(*s, *i);
-	*h = png_get_image_height(*s, *i);
-}
-
 void
 read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 {
@@ -55,10 +32,28 @@ read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 	uint8_t **pngrows;
 
 	/* prepare */
-	png_setup_reader(fd, &pngs, &pngi, (uint32_t*)&size->x, (uint32_t*)&size->y);
+	pngs = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, png_err, NULL);
+	pngi = png_create_info_struct(pngs);
+
+	if (!pngs || !pngi)
+		die("Failed to initialize libpng");
+
+	png_init_io(pngs, fd);
+	if (png_get_valid(pngs, pngi, PNG_INFO_tRNS)) {
+		png_set_tRNS_to_alpha(pngs);
+	}
+	png_set_add_alpha(pngs, 0xffff, PNG_FILLER_AFTER);
+	png_set_expand_gray_1_2_4_to_8(pngs);
+	png_set_gray_to_rgb(pngs);
+	png_set_packing(pngs);
+	// TODO Support 16 bit color depth
+	png_read_png(pngs, pngi, PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_STRIP_16, NULL);
+	size->x = png_get_image_width(pngs, pngi);
+	size->y = png_get_image_height(pngs, pngi);
 	rowlen = size->x * (sizeof("RGBA") - 1);
 	pngrows = png_get_rows(pngs, pngi);
 
+	/* Read data */
 	*pixels = ecalloc(size->x * size->y, sizeof(uint32_t));
 	for (r = 0; r < (size_t)size->y; ++r)
 		memcpy(*pixels + r * size->x, pngrows[r], rowlen);
@@ -68,29 +63,24 @@ read_png(FILE *fd, uint32_t **pixels, Vec2i *size)
 }
 
 static void
-png_setup_writer(FILE *fd, png_struct **s, png_info **i, uint32_t w, uint32_t h)
-{
-	*s = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_err, NULL);
-	*i = png_create_info_struct(*s);
-
-	if (!*s || !*i)
-		die("Failed to initialize libpng");
-
-	png_init_io(*s, fd);
-	png_set_IHDR(*s, *i, w, h, 8, PNG_COLOR_TYPE_RGB_ALPHA,
-	             PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
-	             PNG_FILTER_TYPE_BASE);
-	png_write_info(*s, *i);
-}
-
-void
 write_png(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 {
 	png_struct *pngs;
 	png_info *pngi;
 	int i;
 
-	png_setup_writer(fd, &pngs, &pngi, size.x, size.y);
+	/* Prepare */
+	pngs = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_err, NULL);
+	pngi = png_create_info_struct(pngs);
+
+	if (!pngs || !pngi)
+		die("Failed to initialize libpng");
+
+	png_init_io(pngs, fd);
+	png_set_IHDR(pngs, pngi, size.x, size.y, 8, PNG_COLOR_TYPE_RGB_ALPHA,
+	             PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE,
+	             PNG_FILTER_TYPE_BASE);
+	png_write_info(pngs, pngi);
 
 	/* write data */
 	for (i = off.y; i < size.y + off.y; ++i)
@@ -141,7 +131,7 @@ read_jpg(FILE *fd, uint32_t **pixels, Vec2i *size)
 	jpeg_destroy_decompress(&js);
 }
 
-void
+static void
 write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 {
 	struct jpeg_compress_struct jcomp;
@@ -187,55 +177,69 @@ write_jpg(FILE *fd, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
 	jpeg_destroy_compress(&jcomp);
 }
 
-void
+enum ImgFmt
 read_img(const char *file, uint32_t **pixels, Vec2i *size)
 {
 	uint8_t header[8];
 	uint8_t jpgsig[] = {0xFF, 0xD8};
 	uint8_t pngsig[] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+	int i;
 	FILE *f;
+	enum ImgFmt infmt = 0;
 
-	if (!(f = fopen(file, "rb")))
+	if (!strcmp("-", file))
+		f = stdin;
+	else if (!(f = fopen(file, "rb")))
 		die("%s could not be read", file);
 
 	efread(header, sizeof(header[0]), LENGTH(header), f);
-	if (fseek(f, 0, SEEK_SET))
-		die("%s: seek error", file);
+	/* Put those bytes back where we found them */
+	for (i = LENGTH(header) - 1; i >= 0; i--)
+		if (ungetc(header[i], f) == EOF)
+			die("Failed to put the genie back in the box: ungetc error");
 
-	if (!memcmp(jpgsig, header, sizeof(jpgsig)))
+	if (!memcmp(jpgsig, header, sizeof(jpgsig))) {
 		read_jpg(f, pixels, size);
-	else if (!memcmp(pngsig, header, sizeof(pngsig)))
+		infmt = IMG_JPG;
+	} else if (!memcmp(pngsig, header, sizeof(pngsig))) {
 		read_png(f, pixels, size);
-	else
+		infmt = IMG_PNG;
+	} else {
 		die("%s: unsupported file type", file);
+	}
 
 	fclose(f);
+	return infmt;
 }
 
 void
-write_img(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off)
+write_img(const char *file, uint32_t *pixels, uint32_t stride, Vec2i size, Vec2i off, enum ImgFmt infmt)
 {
-	enum {PNG, JPG};
-	int type = PNG;
+	enum ImgFmt outfmt = IMG_PNG;
 	size_t l = strlen(file) + 1;
 	FILE *f;
 
 	if (!strcmp(".png", file + l - sizeof(".png")))
-		type = PNG;
-	else if(!strcmp(".jpeg", file + l - sizeof(".jpeg")) ||
+		outfmt = IMG_PNG;
+	else if (!strcmp(".jpeg", file + l - sizeof(".jpeg")) ||
 			!strcmp(".jpg", file + l - sizeof(".jpg")))
-		type = JPG;
+		outfmt = IMG_JPG;
+	else if (!strcmp("-", file))  /* For stdout we use the input format */
+		outfmt = infmt;
 	else
 		fprintf(stderr, "Couldn't infer file type of %s: defaulting to png\n", file);
 
-	if (!(f = fopen(file, "wb")))
+	if (!strcmp("-", file)) {
+		f = stdout;
+	} else if (!(f = fopen(file, "wb"))) {
 		die("%s could not be created", file);
+	}
 
-	switch (type) {
-	case PNG:
+	switch (outfmt) {
+	case IMG_PNG:
 		write_png(f, pixels, stride, size, off);
 		break;
-	case JPG:
+	case IMG_JPG:
 		write_jpg(f, pixels, stride, size, off);
 		break;
 	}
