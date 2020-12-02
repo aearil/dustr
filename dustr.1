@@ -6,8 +6,8 @@
 .Nd Light interactive cropping tool
 .Sh SYNOPSIS
 .Nm
-.\" .Op Fl g Ar geometry
 .Brq Fl g Ar geometry | Fl s
+.Op Fl n
 .Ar infile
 .Ar outfile
 .Sh DESCRIPTION
@@ -39,6 +39,8 @@ in the <width>x<height> format. Incompatible with
 .It Fl s
 Click and drag to select an area to crop. Incompatible with
 .Op Fl g
+.It Fl n
+Dry run: the output image isn't written. The geometry of the cropped area is printed to stdout formatted as <width>x<height>@+<x>+<y>, the origin being at the top left of the input image.
 .El
 .Sh EXIT STATUS
 .Bl -tag -width Ds

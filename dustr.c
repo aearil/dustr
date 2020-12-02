@@ -27,6 +27,7 @@ static char *outputfile = NULL;
 static enum Mode mode = ModeInit;
 static int drawcrop = 1;
 static enum ImgFmt infmt;
+static int dryrun = 0;
 
 static int
 init(void)
@@ -107,8 +108,10 @@ mouseevent(SDL_Event *event)
 	case SDL_MOUSEBUTTONUP: {
 		Vec2i pos, size;
 		getfinalcrop(&pos, &size);
-		fprintf(stderr, "%dx%d@+%d+%d\n", size.x, size.y, pos.x, pos.y);
-		write_img(outputfile, pixels, originalsize.x, size, pos, infmt);
+		if (dryrun)
+			fprintf(stdout, "%dx%d@+%d+%d\n", size.x, size.y, pos.x, pos.y);
+		else
+			write_img(outputfile, pixels, originalsize.x, size, pos, infmt);
 		quit();
 		break;
 	}
@@ -201,7 +204,11 @@ draw()
 void
 usage(const char* name)
 {
-	die("Usage: %s [-g <width>x<height>] <img in> <img out>", name);
+	die("Usage: %s {-g <w>x<h>|-s} [-n] <infile> <outfile>\n\n"
+		"\tInteractive image cropping tool.\n\n"
+		"\t-g <w>x<h>  Crop with fixed geometry\n"
+		"\t-s          Crop with mouse selected area\n"
+		"\t-n          Dry run. Print geometry to stdout", name);
 }
 
 int
@@ -214,18 +221,20 @@ main(int argc, char *argv[])
 	/* Parse arguments */
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-g")) {
-			if (argc < i + 4 || sscanf(argv[++i], "%ux%u", (uint32_t*)&requestedcrop.x, (uint32_t*)&requestedcrop.y) < 2)
+			if (argc < i + 2 || sscanf(argv[++i], "%ux%u", (uint32_t*)&requestedcrop.x, (uint32_t*)&requestedcrop.y) < 2)
 				usage(argv[0]);
 			else if (mode != ModeInit)
 				die("Options -g and -s are incompatible");
 			mode = ModeGeom;
 			drawcrop = 1;
+		// TODO add option to choose an aspect ratio rather than geometry
 		} else if (!strcmp(argv[i], "-s")) {
 			if (mode != ModeInit)
 				die("Options -g and -s are incompatible");
 			mode = ModeSelect;
 			drawcrop = 0;
-		// TODO add option to choose an aspect ratio rather than geometry
+		} else if (!strcmp(argv[i], "-n")) {
+			dryrun = 1;
 		} else if (!inputfile) {
 			inputfile = argv[i];
 		} else if (!outputfile) {
@@ -233,7 +242,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (!inputfile || !outputfile)
+	if (!inputfile || !outputfile || mode == ModeInit)
 		usage(argv[0]);
 
 	/* Load image file */
