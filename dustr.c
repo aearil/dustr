@@ -152,16 +152,18 @@ update()
 	case ModeGeom:
 		croporigin.x = mouse.x - croprect.w * 0.5;
 		croporigin.y = mouse.y - croprect.h * 0.5;
+		croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
+		croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
 		break;
 	case ModeSelect:
-		requestedcrop.x = mouse.x - croporigin.x;
-		requestedcrop.y = mouse.y - croporigin.y;
+		croprect.w = mouse.x - croporigin.x;
+		croprect.h = mouse.y - croporigin.y;
+		requestedcrop.x = croprect.w * originalsize.x / imgrect.w;
+		requestedcrop.y = croprect.h * originalsize.y / imgrect.h;
 		break;
 	default:
 		break;
 	}
-	croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
-	croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
 	croprect.x = croporigin.x;
 	croprect.y = croporigin.y;
 	if (croprect.x < imgrect.x)
