@@ -49,4 +49,3 @@ sudo make install
 * Add keyboard movement
 * Batch processing
 * Implicit output filename
-* Dry run (output geometry to stdout)
