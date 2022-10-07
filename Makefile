@@ -3,12 +3,13 @@ MANPREFIX = $(PREFIX)/share/man
 CFLAGS   = -std=c99 -pedantic -Wall -Wextra -Os
 LDFLAGS  = -s
 LIBS = -lSDL2 -lpng -ljpeg
+CC ?= cc
 
 dustr: dustr.o util.o img.o
-	cc $(LDFLAGS) $(LIBS) $^ -o $@
+	$(CC) $(LDFLAGS) $(LIBS) $^ -o $@
 
 %.o: %.c util.h img.h
-	cc $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 install: dustr
 	mkdir -p "$(DESTDIR)$(PREFIX)/bin"
