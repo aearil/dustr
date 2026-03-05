@@ -9,7 +9,7 @@
 #define HEIGHT 600
 #define FPS 30
 
-enum Mode {ModeGeom, ModeSelect, ModeInit};
+enum Mode {ModeGeom, ModeAdjust, ModeSelect, ModeInit};
 
 static SDL_Window *gWindow = NULL;
 static SDL_Renderer *gRenderer = NULL;
@@ -128,6 +128,14 @@ keyevent(SDL_Event *event)
 	case SDLK_ESCAPE:
 		quit();
 		break;
+	// Press and hold M to adjust the position of your crop rectangle in select mode
+	case SDLK_m:
+		if (event->type == SDL_KEYDOWN && mode == ModeSelect) {
+			mode = ModeAdjust;
+		} else if (event->type == SDL_KEYUP && mode == ModeAdjust) {
+			mode = ModeSelect;
+		}
+		break;
 	}
 }
 
@@ -153,8 +161,14 @@ update()
 	/* Compute displayed crop rectangle */
 	switch (mode) {
 	case ModeGeom:
+	case ModeAdjust:
 		croporigin.x = mouse.x - croprect.w * 0.5;
 		croporigin.y = mouse.y - croprect.h * 0.5;
+		// In adjust mode, anchor to the currently dragged corner
+		if (mode == ModeAdjust) {
+			croporigin.x -= croprect.w * 0.5;
+			croporigin.y -= croprect.h * 0.5;
+		}
 		croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
 		croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
 
@@ -239,10 +253,13 @@ void
 usage(const char* name)
 {
 	die("Usage: %s {-g <w>x<h>|-s} [-n] <infile> <outfile>\n\n"
-		"\tInteractive image cropping tool.\n\n"
+		"Interactive image cropping tool.\n"
 		"\t-g <w>x<h>  Crop with fixed geometry\n"
 		"\t-s          Crop with mouse selected area\n"
-		"\t-n          Dry run. Print geometry to stdout", name);
+		"\t-n          Dry run. Print geometry to stdout\n\n"
+		"Keybinds:\n"
+		"\tEsc/Q       Quit\n"
+		"\tM           Hold to adjust (select mode)\n", name);
 }
 
 int
@@ -299,7 +316,8 @@ main(int argc, char *argv[])
 					 event.type == SDL_MOUSEBUTTONDOWN ||
 					 event.type == SDL_MOUSEMOTION) {
 				mouseevent(&event);
-			} else if (event.type == SDL_KEYDOWN) {
+			} else if (event.type == SDL_KEYDOWN ||
+					   event.type == SDL_KEYUP) {
 				keyevent(&event);
 			} else if (event.type == SDL_WINDOWEVENT) {
 				if (event.window.event == SDL_WINDOWEVENT_EXPOSED ||
