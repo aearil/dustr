@@ -157,26 +157,60 @@ update()
 		croporigin.y = mouse.y - croprect.h * 0.5;
 		croprect.w = requestedcrop.x * imgrect.w / originalsize.x;
 		croprect.h = requestedcrop.y * imgrect.h / originalsize.y;
+
+		croprect.x = croporigin.x;
+		croprect.y = croporigin.y;
+		if (croprect.x < imgrect.x)
+			croprect.x = imgrect.x;
+		else if (croprect.x + croprect.w > imgrect.x + imgrect.w)
+			croprect.x = imgrect.x + imgrect.w - croprect.w;
+		if (croprect.y < imgrect.y)
+			croprect.y = imgrect.y;
+		else if (croprect.y + croprect.h > imgrect.y + imgrect.h)
+			croprect.y = imgrect.y + imgrect.h - croprect.h;
 		break;
 	case ModeSelect:
-		croprect.w = mouse.x - croporigin.x;
-		croprect.h = mouse.y - croporigin.y;
+		croprect.x = croporigin.x;
+		croprect.y = croporigin.y;
+
+		// Constrain crop rectangle origin
+		if (croprect.x < imgrect.x)
+			croprect.x = imgrect.x;
+		else if (croprect.x > imgrect.x + imgrect.w)
+			croprect.x = imgrect.x + imgrect.w;
+		if (croprect.y < imgrect.y)
+			croprect.y = imgrect.y;
+		else if (croprect.y > imgrect.y + imgrect.h)
+			croprect.y = imgrect.y + imgrect.h;
+
+		croprect.w = mouse.x - croprect.x;
+		croprect.h = mouse.y - croprect.y;
+
+		// Contrain cropping area to the image
+		if (croprect.w > imgrect.w)
+			croprect.w = imgrect.w;
+		else if (-croprect.w > imgrect.w)
+			croprect.w = -imgrect.w;
+		if (croprect.h > imgrect.h)
+			croprect.h = imgrect.h;
+		else if (-croprect.h > imgrect.h)
+			croprect.h = -imgrect.h;
+
+		if (croprect.x + croprect.w < imgrect.x)
+			croprect.w = imgrect.x - croprect.x;
+		else if (croprect.x + croprect.w > imgrect.x + imgrect.w)
+			croprect.w = imgrect.x + imgrect.w - croprect.x;
+		if (croprect.y + croprect.h < imgrect.y)
+			croprect.h = imgrect.y - croprect.y;
+		else if (croprect.y + croprect.h > imgrect.y + imgrect.h)
+			croprect.h = imgrect.y + imgrect.h - croprect.y;
+
 		requestedcrop.x = croprect.w * originalsize.x / imgrect.w;
 		requestedcrop.y = croprect.h * originalsize.y / imgrect.h;
 		break;
 	default:
 		break;
 	}
-	croprect.x = croporigin.x;
-	croprect.y = croporigin.y;
-	if (croprect.x < imgrect.x)
-		croprect.x = imgrect.x;
-	else if (croprect.x + croprect.w > imgrect.x + imgrect.w)
-		croprect.x = imgrect.x + imgrect.w - croprect.w;
-	if (croprect.y < imgrect.y)
-		croprect.y = imgrect.y;
-	else if (croprect.y + croprect.h > imgrect.y + imgrect.h)
-		croprect.y = imgrect.y + imgrect.h - croprect.h;
 }
 
 void
